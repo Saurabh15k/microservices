@@ -18,7 +18,7 @@ const validateCreateOrder=[
         .notEmpty().withMessage('State is required'),
     body('shippingAddress.zip').isString().withMessage('Zip must be a string').notEmpty()
         .withMessage('Zip is required').bail().matches(/^\d{4,}$/).withMessage('Zip must be at least 4 digits'),
-    body('shippingAddress.country').isString().withMessage('Country is required')
+    body('shippingAddress.country').isString().withMessage('Country must be string')
         .notEmpty()
         .withMessage('Country is required'),
         resposeWithValidationErrors
