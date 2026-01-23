@@ -2,11 +2,11 @@ const userModel = require('../models/user.model');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const redis = require('../db/redis');
-const {publishToQueue}=require("../broker/broker");
+const { publishToQueue } = require("../broker/broker");
 
 async function registerUser(req, res) {
     try {
-        const { username, email, password, fullName: { firstName, lastName },role } = req.body;
+        const { username, email, password, fullName: { firstName, lastName }, role } = req.body;
 
         const isUserExists = await userModel.findOne({
             $or: [{ username }, { email }]
@@ -25,22 +25,25 @@ async function registerUser(req, res) {
             role: role || 'user'
         });
 
-        publishToQueue("AUTH_NOTIFICATION.USER_CREATED",{
-            id: user._id,
-            username: user.username,
-            email: user.email,
-            fullName:{
-                firstName:firstName,
-                lastName:lastName
-            }
-        })
+        await Promise.all([
+            publishToQueue("AUTH_NOTIFICATION.USER_CREATED", {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: {
+                    firstName: firstName,
+                    lastName: lastName
+                }
+            }),
+            publishToQueue("AUTH_SELLER_DASHBOARD.USER_CREADTED", user)
+        ])
 
         const token = jwt.sign({
             id: user._id,
             username: user.username,
             email: user.email,
             role: user.role,
-            fullName:user.fullName
+            fullName: user.fullName
         }, process.env.JWT_SECRET_KEY, { expiresIn: '1h' });
         res.cookie('token', token, {
             httpOnly: true,
@@ -153,24 +156,24 @@ async function getUserAddresses(req, res) {
     }
 }
 
-async function addUserAddresses(req,res){
-    const id=req.user.id
-    const {street,city,state,zip,country,isDefault}=req.body
-    const user=await userModel.findOneAndUpdate({_id:id},{
-        $push:{
-            addresses:{street,city,state,zip,country,isDefault:isDefault || false}
+async function addUserAddresses(req, res) {
+    const id = req.user.id
+    const { street, city, state, zip, country, isDefault } = req.body
+    const user = await userModel.findOneAndUpdate({ _id: id }, {
+        $push: {
+            addresses: { street, city, state, zip, country, isDefault: isDefault || false }
         }
-    },{new:true})
-    if(!user){
-        return res.status(404).json({message:'User not found.'})
+    }, { new: true })
+    if (!user) {
+        return res.status(404).json({ message: 'User not found.' })
     }
     return res.status(201).json({
-        message:'Address added successfully.',
-        address:user.addresses[user.addresses.length-1]
+        message: 'Address added successfully.',
+        address: user.addresses[user.addresses.length - 1]
     })
 }
 
-async function deleteUserAddresses(req,res) {
+async function deleteUserAddresses(req, res) {
     try {
         const id = req.user.id;
         const { addressId } = req.params;
